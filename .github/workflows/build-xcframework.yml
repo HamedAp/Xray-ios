@@ -2,10 +2,6 @@ name: Build libXray XCFramework
 
 on:
   workflow_dispatch:
-  push:
-    branches: [ main ]
-  release:
-    types: [published]
 
 jobs:
   build-xcframework:
@@ -14,32 +10,32 @@ jobs:
       - name: Install Go
         uses: actions/setup-go@v5
         with:
-          go-version: '1.23.x'
+          go-version: '1.23.x' # pick the latest stable Go
+
+      - name: Install Homebrew packages
+        run: |
+          brew update
+          brew install cmake ninja python3 pkg-config
+
+      - name: Add GOPATH bin to PATH
+        run: echo "${HOME}/go/bin" >> $GITHUB_PATH
+
       - name: Checkout libXray
         uses: actions/checkout@v4
         with:
           repository: XTLS/libXray
           path: libxray
 
-      - name: Checkout Xray-core (needed by libXray build)
+      - name: Checkout Xray-core
         uses: actions/checkout@v4
         with:
           repository: XTLS/Xray-core
           path: xray-core
 
-      - name: Install Homebrew packages
-        run: |
-          brew update
-          brew install go cmake ninja python3 pkg-config
-
-      - name: Add GOPATH bin to PATH
-        run: echo "${HOME}/go/bin" >> $GITHUB_PATH
-
       - name: Install gomobile
         run: |
-          /usr/local/bin/go install golang.org/x/mobile/cmd/gomobile@latest || true
-          ${HOME}/go/bin/gomobile version || ${GITHUB_WORKSPACE}/go/bin/gomobile version
-          ${HOME}/go/bin/gomobile init || true
+          go install golang.org/x/mobile/cmd/gomobile@latest
+          gomobile init
 
       - name: Run libXray build (apple gomobile)
         working-directory: libxray
@@ -55,21 +51,14 @@ jobs:
       - name: Create XCFramework (fallback)
         if: steps.find.outputs.path == ''
         run: |
-          # Try to find static libs and headers (may need adjust)
           libdev=$(find libxray -name '*ios*arm64*.a' -print -quit || true)
           libsim=$(find libxray -name '*iossim*arm64*.a' -print -quit || true)
           headers=$(find libxray -type d -name include -print -quit || true)
-          echo "dev=$libdev"
-          echo "sim=$libsim"
-          echo "headers=$headers"
           mkdir -p out
           xcodebuild -create-xcframework \
             -library "$libdev" -headers "$headers" \
             -library "$libsim" -headers "$headers" \
             -output out/libXray.xcframework
-          echo "out/libXray.xcframework" > xc_path.txt
-        env:
-          DEVELOPER_DIR: /Applications/Xcode.app/Contents/Developer
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
