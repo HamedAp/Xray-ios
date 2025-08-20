@@ -67,3 +67,32 @@ jobs:
           path: |
             ${{ steps.find.outputs.path }}
             out/libXray.xcframework
+
+      - name: Create Release
+        id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: v${{ github.run_number }}
+          release_name: libXray XCFramework v${{ github.run_number }}
+          draft: false
+          prerelease: false
+
+      - name: Zip XCFramework
+        run: |
+          xc_path="${{ steps.find.outputs.path }}"
+          if [ -z "$xc_path" ]; then
+            xc_path="out/libXray.xcframework"
+          fi
+          zip -r libXray.xcframework.zip "$xc_path"
+
+      - name: Upload Release Asset
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.create_release.outputs.upload_url }}
+          asset_path: libXray.xcframework.zip
+          asset_name: libXray.xcframework.zip
+          asset_content_type: application/zip
